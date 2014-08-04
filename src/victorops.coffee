@@ -10,7 +10,7 @@
 
 Readline = require 'readline'
 WebSocket = require 'ws'
-{Adapter,Robot,TextMessage,EnterMessage,LeaveMessage} = require 'hubot'
+{Adapter,Robot,TextMessage} = require 'hubot'
 
 class Shell
 
@@ -33,7 +33,6 @@ class Shell
     @repl.on 'line', (buffer) =>
       if buffer.trim().length > 0
         @repl.close() if buffer.toLowerCase() is 'exit'
-        user = @robot.brain.userForId '1', name: 'Shell', room: 'Shell'
         @vo.sendToVO @vo.chat(buffer)
       @repl.prompt()
 
@@ -48,10 +47,11 @@ class VictorOps extends Adapter
 
   constructor: (robot) ->
     @wsURL = process.env.HUBOT_VICTOROPS_URL
-    @userID = process.env.HUBOT_VICTOROPS_USER
     @password = process.env.HUBOT_VICTOROPS_PASSWORD
     @orgSlug = process.env.HUBOT_VICTOROPS_ORG
+    @userID = robot.name
     @robot = robot
+    @connected = false
     super robot
 
   generateUUID: ->
@@ -106,24 +106,23 @@ class VictorOps extends Adapter
   respond: (regex, callback) ->
     @hear regex, callback
 
-  run: ->
-    self = @
+  connectToVO: () ->
+    _ = @
 
-    @loginMsg = self.login( self.userID, self.password, self.orgSlug )
-    #console.log @loginMsg
+    console.log "Attempting connection to VictorOps..."
 
     @ws = new WebSocket(@wsURL)
 
     @ws.on "open", () ->
-      user = self.robot.brain.userForId '1', name: 'Shell', room: 'Shell'
-      self.sendToVO( self.loginMsg )
+      _.connected = true
+      _.sendToVO( _.login( _.userID, _.password, _.orgSlug ) )
 
     @ws.on "message", (message) ->
-      self.receive_ws( message )
+      _.receive_ws( message )
 
-    @shell = new Shell( @robot, self )
-
-    self.emit "connected"
+    @ws.on 'close', () ->
+      _.connected = false
+      console.log 'disconnected!'
 
   receive_ws: (msg) ->
     data = JSON.parse( msg.replace /VO-MESSAGE:[^\{]*/, "" )
@@ -132,11 +131,21 @@ class VictorOps extends Adapter
     # console.log msg
 
     if data.MESSAGE == "CHAT_NOTIFY_MESSAGE" && data.PAYLOAD.CHAT.USER_ID != @robot.name
-      console.log "Allow hubot to receive message from #{data.PAYLOAD.CHAT.USER_ID}"
       user = @robot.brain.userForId data.PAYLOAD.CHAT.USER_ID
       @receive new TextMessage user, data.PAYLOAD.CHAT.TEXT
 
     @shell.prompt()
+
+
+  run: ->
+    @shell = new Shell( @robot, @ )
+
+    setInterval =>
+      if ( ! @connected )
+        @connectToVO()
+    , 5000
+
+    @emit "connected"
 
 exports.VictorOps = VictorOps
 
