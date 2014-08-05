@@ -124,6 +124,11 @@ class VictorOps extends Adapter
       _.connected = false
       console.log 'disconnected!'
 
+  rcvIncidentMsg: ( user, entity ) ->
+    hubotMsg = "hubot VictorOps entitystate #{entity.INCIDENT_NAME} #{entity.CURRENT_ALERT_PHASE} #{entity.ENTITY_ID} #{entity.CURRENT_STATE}"
+    console.log hubotMsg
+    @receive new TextMessage user, hubotMsg
+
   receive_ws: (msg) ->
     data = JSON.parse( msg.replace /VO-MESSAGE:[^\{]*/, "" )
 
@@ -133,6 +138,10 @@ class VictorOps extends Adapter
     if data.MESSAGE == "CHAT_NOTIFY_MESSAGE" && data.PAYLOAD.CHAT.USER_ID != @robot.name
       user = @robot.brain.userForId data.PAYLOAD.CHAT.USER_ID
       @receive new TextMessage user, data.PAYLOAD.CHAT.TEXT
+
+    else if data.MESSAGE == "ENTITY_STATE_NOTIFY_MESSAGE"
+      user = @robot.brain.userForId "VictorOps"
+      @rcvIncidentMsg user, entity for entity in data.PAYLOAD.SYSTEM_ALERT_STATE_LIST
 
     @shell.prompt()
 
