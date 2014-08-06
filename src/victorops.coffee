@@ -124,6 +124,7 @@ class VictorOps extends Adapter
       _.connected = false
       console.log 'disconnected!'
 
+  # Transform incident notifications into hubot messages too
   rcvIncidentMsg: ( user, entity ) ->
     hubotMsg = "hubot VictorOps entitystate #{entity.INCIDENT_NAME} #{entity.CURRENT_ALERT_PHASE} #{entity.ENTITY_ID} #{entity.CURRENT_STATE}"
     console.log hubotMsg
@@ -142,6 +143,10 @@ class VictorOps extends Adapter
     else if data.MESSAGE == "ENTITY_STATE_NOTIFY_MESSAGE"
       user = @robot.brain.userForId "VictorOps"
       @rcvIncidentMsg user, entity for entity in data.PAYLOAD.SYSTEM_ALERT_STATE_LIST
+
+    else if data.MESSAGE == "LOGIN_REPLY_MESSAGE" && data.PAYLOAD.STATUS != "200"
+      console.log "Failed to log in: #{data.PAYLOAD.DESCRIPTION}"
+      process.exit 1
 
     @shell.prompt()
 
