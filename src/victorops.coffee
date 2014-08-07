@@ -47,11 +47,10 @@ class VictorOps extends Adapter
 
   constructor: (robot) ->
     @wsURL = process.env.HUBOT_VICTOROPS_URL
-    @password = process.env.HUBOT_VICTOROPS_PASSWORD
-    @orgSlug = process.env.HUBOT_VICTOROPS_ORG
-    @userID = robot.name
+    @password = process.env.HUBOT_VICTOROPS_KEY
     @robot = robot
     @connected = false
+    @loggedIn = false
     super robot
 
   generateUUID: ->
@@ -62,16 +61,14 @@ class VictorOps extends Adapter
       v.toString(16)
     )
 
-  login: (user, password, company) ->
+  login: () ->
     msg = {
-      "MESSAGE": "LOGIN_REQUEST_MESSAGE",
+      "MESSAGE": "ROBOT_LOGIN_REQUEST_MESSAGE",
       "TRANSACTION_ID": @generateUUID(),
       "PAYLOAD": {
-          "PASSWORD": password,
-          "ROLE": "USER",
           "PROTOCOL": "1.0",
-          "USER_ID": user,
-          "COMPANY_ID": company,
+          "NAME": @robot.name,
+          "KEY": @password,
           "DEVICE_NAME": "hubot"
       }
     }
@@ -110,12 +107,18 @@ class VictorOps extends Adapter
     _ = @
 
     console.log "Attempting connection to VictorOps..."
+    _.loggedIn = false
 
     @ws = new WebSocket(@wsURL)
 
     @ws.on "open", () ->
       _.connected = true
-      _.sendToVO( _.login( _.userID, _.password, _.orgSlug ) )
+      _.sendToVO( _.login() )
+      setTimeout ->
+        if ( ! _.loggedIn )
+          console.log "Failed to receive login success."
+          process.exit 2
+      , 5000
 
     @ws.on "message", (message) ->
       _.receive_ws( message )
@@ -144,15 +147,19 @@ class VictorOps extends Adapter
       user = @robot.brain.userForId "VictorOps"
       @rcvIncidentMsg user, entity for entity in data.PAYLOAD.SYSTEM_ALERT_STATE_LIST
 
-    else if data.MESSAGE == "LOGIN_REPLY_MESSAGE" && data.PAYLOAD.STATUS != "200"
-      console.log "Failed to log in: #{data.PAYLOAD.DESCRIPTION}"
-      process.exit 1
+    else if data.MESSAGE == "LOGIN_REPLY_MESSAGE"
+      if data.PAYLOAD.STATUS != "200"
+        console.log "Failed to log in: #{data.PAYLOAD.DESCRIPTION}"
+        process.exit 1
+      @loggedIn = true
 
     @shell.prompt()
 
 
   run: ->
     @shell = new Shell( @robot, @ )
+
+    @connectToVO()
 
     setInterval =>
       if ( ! @connected )
