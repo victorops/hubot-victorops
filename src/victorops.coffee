@@ -10,7 +10,7 @@
 
 Readline = require 'readline'
 WebSocket = require 'ws'
-{Adapter,Robot,TextMessage,EnterMessage,LeaveMessage} = require 'hubot'
+{Adapter,Robot,TextMessage} = require 'hubot'
 
 class Shell
 
@@ -33,7 +33,6 @@ class Shell
     @repl.on 'line', (buffer) =>
       if buffer.trim().length > 0
         @repl.close() if buffer.toLowerCase() is 'exit'
-        user = @robot.brain.userForId '1', name: 'Shell', room: 'Shell'
         @vo.sendToVO @vo.chat(buffer)
       @repl.prompt()
 
@@ -48,10 +47,10 @@ class VictorOps extends Adapter
 
   constructor: (robot) ->
     @wsURL = process.env.HUBOT_VICTOROPS_URL
-    @userID = process.env.HUBOT_VICTOROPS_USER
-    @password = process.env.HUBOT_VICTOROPS_PASSWORD
-    @orgSlug = process.env.HUBOT_VICTOROPS_ORG
+    @password = process.env.HUBOT_VICTOROPS_KEY
     @robot = robot
+    @connected = false
+    @loggedIn = false
     super robot
 
   generateUUID: ->
@@ -62,16 +61,14 @@ class VictorOps extends Adapter
       v.toString(16)
     )
 
-  login: (user, password, company) ->
+  login: () ->
     msg = {
-      "MESSAGE": "LOGIN_REQUEST_MESSAGE",
+      "MESSAGE": "ROBOT_LOGIN_REQUEST_MESSAGE",
       "TRANSACTION_ID": @generateUUID(),
       "PAYLOAD": {
-          "PASSWORD": password,
-          "ROLE": "USER",
           "PROTOCOL": "1.0",
-          "USER_ID": user,
-          "COMPANY_ID": company,
+          "NAME": @robot.name,
+          "KEY": @password,
           "DEVICE_NAME": "hubot"
       }
     }
@@ -106,24 +103,35 @@ class VictorOps extends Adapter
   respond: (regex, callback) ->
     @hear regex, callback
 
-  run: ->
-    self = @
+  connectToVO: () ->
+    _ = @
 
-    @loginMsg = self.login( self.userID, self.password, self.orgSlug )
-    #console.log @loginMsg
+    console.log "Attempting connection to VictorOps..."
+    _.loggedIn = false
 
     @ws = new WebSocket(@wsURL)
 
     @ws.on "open", () ->
-      user = self.robot.brain.userForId '1', name: 'Shell', room: 'Shell'
-      self.sendToVO( self.loginMsg )
+      _.connected = true
+      _.sendToVO( _.login() )
+      setTimeout ->
+        if ( ! _.loggedIn )
+          console.log "Failed to receive login success."
+          process.exit 2
+      , 5000
 
     @ws.on "message", (message) ->
-      self.receive_ws( message )
+      _.receive_ws( message )
 
-    @shell = new Shell( @robot, self )
+    @ws.on 'close', () ->
+      _.connected = false
+      console.log 'disconnected!'
 
-    self.emit "connected"
+  # Transform incident notifications into hubot messages too
+  rcvIncidentMsg: ( user, entity ) ->
+    hubotMsg = "hubot VictorOps entitystate #{entity.INCIDENT_NAME} #{entity.CURRENT_ALERT_PHASE} #{entity.ENTITY_ID} #{entity.CURRENT_STATE}"
+    console.log hubotMsg
+    @receive new TextMessage user, hubotMsg
 
   receive_ws: (msg) ->
     data = JSON.parse( msg.replace /VO-MESSAGE:[^\{]*/, "" )
@@ -132,11 +140,33 @@ class VictorOps extends Adapter
     # console.log msg
 
     if data.MESSAGE == "CHAT_NOTIFY_MESSAGE" && data.PAYLOAD.CHAT.USER_ID != @robot.name
-      console.log "Allow hubot to receive message from #{data.PAYLOAD.CHAT.USER_ID}"
       user = @robot.brain.userForId data.PAYLOAD.CHAT.USER_ID
       @receive new TextMessage user, data.PAYLOAD.CHAT.TEXT
 
+    else if data.MESSAGE == "ENTITY_STATE_NOTIFY_MESSAGE"
+      user = @robot.brain.userForId "VictorOps"
+      @rcvIncidentMsg user, entity for entity in data.PAYLOAD.SYSTEM_ALERT_STATE_LIST
+
+    else if data.MESSAGE == "LOGIN_REPLY_MESSAGE"
+      if data.PAYLOAD.STATUS != "200"
+        console.log "Failed to log in: #{data.PAYLOAD.DESCRIPTION}"
+        process.exit 1
+      @loggedIn = true
+
     @shell.prompt()
+
+
+  run: ->
+    @shell = new Shell( @robot, @ )
+
+    @connectToVO()
+
+    setInterval =>
+      if ( ! @connected )
+        @connectToVO()
+    , 5000
+
+    @emit "connected"
 
 exports.VictorOps = VictorOps
 
