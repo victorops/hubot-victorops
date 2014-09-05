@@ -19,6 +19,7 @@ class Shell
     stdin = process.openStdin()
     stdout = process.stdout
     @vo = vo
+    @user = @robot.brain.userForId '1', name: 'Shell', room: 'Shell'
 
     process.on 'uncaughtException', (err) =>
       @robot.logger.error err.stack
@@ -34,6 +35,7 @@ class Shell
       if buffer.trim().length > 0
         @repl.close() if buffer.toLowerCase() is 'exit'
         @vo.sendToVO @vo.chat(buffer)
+        @robot.receive new TextMessage @user, buffer, 'messageId'
       @repl.prompt()
 
     @repl.setPrompt "#{@robot.name} >> "
