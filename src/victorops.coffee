@@ -46,7 +46,11 @@ class Shell
 class VictorOps extends Adapter
 
   constructor: (robot) ->
-    @wsURL = process.env.HUBOT_VICTOROPS_URL
+    @wsURL = if (process.env.HUBOT_VICTOROPS_URL?)
+      process.env.HUBOT_VICTOROPS_URL
+    else
+      'wss://chat.victorops.com/chat'
+
     @password = process.env.HUBOT_VICTOROPS_KEY
     @robot = robot
     @connected = false
@@ -106,7 +110,7 @@ class VictorOps extends Adapter
   connectToVO: () ->
     _ = @
 
-    console.log "Attempting connection to VictorOps..."
+    console.log "Attempting connection to VictorOps at #{@wsURL}..."
     _.loggedIn = false
 
     @ws = new WebSocket(@wsURL)

@@ -1,13 +1,16 @@
 hubot-victorops
 ===============
+Install Hubot according to the instructions: [https://github.com/github/hubot/tree/master/docs](https://github.com/github/hubot/tree/master/docs)
 
-Install the VictorOps adapter to Hubot:
-> npm install ./hubot-victorops
+Clone this repo. Then install the VictorOps adapter to Hubot:
+
+    npm install ./hubot-victorops
 
 Settings go in environment variables:
-> export HUBOT_VICTOROPS_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
-> export HUBOT_VICTOROPS_URL=wss://chat.victorops.com/chat
+    HUBOT_VICTOROPS_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    export HUBOT_VICTOROPS_KEY
 
 Run hubot:
-> bin/hubot --adapter victorops
+
+    bin/hubot --adapter victorops
