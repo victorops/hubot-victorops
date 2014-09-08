@@ -135,7 +135,7 @@ class VictorOps extends Adapter
 
   # Transform incident notifications into hubot messages too
   rcvIncidentMsg: ( user, entity ) ->
-    hubotMsg = "hubot VictorOps entitystate #{entity.INCIDENT_NAME} #{entity.CURRENT_ALERT_PHASE} #{entity.ENTITY_ID} #{entity.CURRENT_STATE}"
+    hubotMsg = "VictorOps entitystate #{JSON.stringify(entity)}"
     console.log hubotMsg
     @receive new TextMessage user, hubotMsg
 
