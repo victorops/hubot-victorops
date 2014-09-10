@@ -1,12 +1,7 @@
-#//==========================================================================//
-#//             Copyright 2014 VictorOps, Inc. All Rights Reserved           //
-#//                                                                          //
-#//                 PROPRIETARY AND CONFIDENTIAL INFORMATION                 //
-#// The information contained herein is the proprietary and confidential     //
-#// property of VictorOps, Inc. and may not be used, distributed, modified,  //
-#// disclosed or reproduced without the express written permission of        //
-#// VictorOps, Inc.                                                          //
-#//==========================================================================//
+#==========================================================================
+# Copyright 2014 VictorOps, Inc.
+# https://github.com/victorops/hubot-victorops/blob/master/LICENSE
+#==========================================================================
 
 Readline = require 'readline'
 WebSocket = require 'ws'
