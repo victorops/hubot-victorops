@@ -22,6 +22,7 @@ class Shell
     @repl = Readline.createInterface stdin, stdout, null
 
     @repl.on 'close', =>
+      console.log()
       stdin.destroy()
       @robot.shutdown()
       process.exit 0
@@ -43,16 +44,25 @@ class Shell
 class VictorOps extends Adapter
 
   constructor: (robot) ->
-    @wsURL = if (process.env.HUBOT_VICTOROPS_URL?)
-      process.env.HUBOT_VICTOROPS_URL
-    else
-      'wss://chat.victorops.com/chat'
-
+    @wsURL = @envWithDefault( process.env.HUBOT_VICTOROPS_URL, 'wss://chat.victorops.com/chat' )
     @password = process.env.HUBOT_VICTOROPS_KEY
     @robot = robot
-    @connected = false
     @loggedIn = false
+    @loginAttempts = @getLoginAttempts()
+    @loginRetryInterval = @envIntWithDefault( process.env.HUBOT_VICTOROPS_LOGIN_INTERVAL, 5 ) * 1000
     super robot
+
+  envWithDefault: (envVar, defVal) ->
+    if (envVar?)
+      envVar
+    else
+      defVal
+
+  envIntWithDefault: (envVar, defVal) ->
+    parseInt( @envWithDefault( envVar, "#{defVal}" ), 30 )
+
+  getLoginAttempts: () ->
+    @envIntWithDefault( process.env.HUBOT_VICTOROPS_LOGIN_ATTEMPTS, 15 )
 
   generateUUID: ->
     d = new Date().getTime()
@@ -107,25 +117,26 @@ class VictorOps extends Adapter
   connectToVO: () ->
     _ = @
 
+    if @ws?
+      @ws.close()
+
+    if @loginAttempts-- <= 0
+      console.log "Unable to connect; giving up."
+      process.exit 1
+
     console.log "Attempting connection to VictorOps at #{@wsURL}..."
     _.loggedIn = false
 
     @ws = new WebSocket(@wsURL)
 
     @ws.on "open", () ->
-      _.connected = true
       _.sendToVO( _.login() )
-      setTimeout ->
-        if ( ! _.loggedIn )
-          console.log "Failed to receive login success."
-          process.exit 2
-      , 5000
 
     @ws.on "message", (message) ->
       _.receive_ws( message )
 
     @ws.on 'close', () ->
-      _.connected = false
+      _.loggedIn = false
       console.log 'disconnected!'
 
   # Transform incident notifications into hubot messages too
@@ -151,8 +162,9 @@ class VictorOps extends Adapter
     else if data.MESSAGE == "LOGIN_REPLY_MESSAGE"
       if data.PAYLOAD.STATUS != "200"
         console.log "Failed to log in: #{data.PAYLOAD.DESCRIPTION}"
-        process.exit 1
-      @loggedIn = true
+      else
+        @loginAttempts = @getLoginAttempts()
+        @loggedIn = true
 
     @shell.prompt()
 
@@ -163,9 +175,9 @@ class VictorOps extends Adapter
     @connectToVO()
 
     setInterval =>
-      if ( ! @connected )
+      if ( ! @loggedIn )
         @connectToVO()
-    , 5000
+    , @loginRetryInterval
 
     @emit "connected"
 
