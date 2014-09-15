@@ -8,7 +8,7 @@ This Hubot adapter allows your Hubot to join your VictorOps timeline.  You can t
 ## Installation
 First, install Hubot according to the instructions: [https://github.com/github/hubot/tree/master/docs](https://github.com/github/hubot/tree/master/docs)
 
-1. Add the VictorOps adapter to your Hubot's dependencies:
+1. Add the VictorOps adapter to your Hubot's dependencies in package.json:
 
         ...
         "dependencies": {
