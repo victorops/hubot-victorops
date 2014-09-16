@@ -30,7 +30,7 @@ class Shell
     @repl.on 'line', (buffer) =>
       if buffer.trim().length > 0
         @repl.close() if buffer.toLowerCase() is 'exit'
-        @vo.sendToVO @vo.chat(buffer)
+        @vo.send( @robot.name, buffer )
         @robot.receive new TextMessage @user, buffer, 'messageId'
       @repl.prompt()
 
@@ -50,6 +50,7 @@ class VictorOps extends Adapter
     @loggedIn = false
     @loginAttempts = @getLoginAttempts()
     @loginRetryInterval = @envIntWithDefault( process.env.HUBOT_VICTOROPS_LOGIN_INTERVAL, 5 ) * 1000
+    @pongLimit = @envIntWithDefault( process.env.HUBOT_VICTOROPS_LOGIN_PONG_LIMIT, 17000 )
     super robot
 
   envWithDefault: (envVar, defVal) ->
@@ -59,7 +60,7 @@ class VictorOps extends Adapter
       defVal
 
   envIntWithDefault: (envVar, defVal) ->
-    parseInt( @envWithDefault( envVar, "#{defVal}" ), 30 )
+    parseInt( @envWithDefault( envVar, "#{defVal}" ), 10 )
 
   getLoginAttempts: () ->
     @envIntWithDefault( process.env.HUBOT_VICTOROPS_LOGIN_ATTEMPTS, 15 )
@@ -98,11 +99,11 @@ class VictorOps extends Adapter
       }
     }
 
-  sendToVO: (js) ->
+  sendToVO: (js, ws=@ws) ->
     m = JSON.stringify(js)
     message = "VO-MESSAGE:" + m.length + "\n" + m
-    console.log "send to chat server: #{message}"
-    @ws.send( message )
+    console.log "send to chat server: #{message}" if js.MESSAGE != "PING"
+    ws.send( message )
 
   send: (user, strings...) ->
     js = @chat( strings.join "\n" )
@@ -114,30 +115,46 @@ class VictorOps extends Adapter
   respond: (regex, callback) ->
     @hear regex, callback
 
+  ping: () ->
+    msg = {
+      "MESSAGE": "PING",
+      "TRANSACTION_ID": @generateUUID()
+    }
+    @sendToVO(msg)
+
   connectToVO: () ->
     _ = @
 
-    if @ws?
-      @ws.close()
+    @disconnect()
 
     if @loginAttempts-- <= 0
       console.log "Unable to connect; giving up."
       process.exit 1
 
     console.log "Attempting connection to VictorOps at #{@wsURL}..."
-    _.loggedIn = false
 
-    @ws = new WebSocket(@wsURL)
+    ws = new WebSocket(@wsURL)
 
-    @ws.on "open", () ->
-      _.sendToVO( _.login() )
+    ws.on "open", () ->
+      _.sendToVO( _.login(), @ )
 
-    @ws.on "message", (message) ->
-      _.receive_ws( message )
+    ws.on "error", (error) ->
+      _.disconnect(error)
 
-    @ws.on 'close', () ->
+    ws.on "message", (message) ->
+      _.receive_ws( message, @ )
+
+    ws.on 'close', () ->
       _.loggedIn = false
-      console.log 'disconnected!'
+      console.log 'WebSocket closed.'
+
+  disconnect: (error) ->
+    @lastPong = new Date()
+    @loggedIn = false
+    if @ws?
+      console.log("#{error} - disconnecting...")
+      @ws.terminate()
+      @ws = null
 
   # Transform incident notifications into hubot messages too
   rcvIncidentMsg: ( user, entity ) ->
@@ -145,15 +162,18 @@ class VictorOps extends Adapter
     console.log hubotMsg
     @receive new TextMessage user, hubotMsg
 
-  receive_ws: (msg) ->
+  receive_ws: (msg, ws) ->
     data = JSON.parse( msg.replace /VO-MESSAGE:[^\{]*/, "" )
 
-    console.log "Received #{data.MESSAGE}"
+    console.log "Received #{data.MESSAGE}" if data.MESSAGE != "PONG"
     # console.log msg
 
     if data.MESSAGE == "CHAT_NOTIFY_MESSAGE" && data.PAYLOAD.CHAT.USER_ID != @robot.name
       user = @robot.brain.userForId data.PAYLOAD.CHAT.USER_ID
       @receive new TextMessage user, data.PAYLOAD.CHAT.TEXT
+
+    else if data.MESSAGE == "PONG"
+      @lastPong = new Date()
 
     else if data.MESSAGE == "ENTITY_STATE_NOTIFY_MESSAGE"
       user = @robot.brain.userForId "VictorOps"
@@ -162,11 +182,14 @@ class VictorOps extends Adapter
     else if data.MESSAGE == "LOGIN_REPLY_MESSAGE"
       if data.PAYLOAD.STATUS != "200"
         console.log "Failed to log in: #{data.PAYLOAD.DESCRIPTION}"
+        @loggedIn = false
+        ws.terminate()
       else
+        @ws = ws
         @loginAttempts = @getLoginAttempts()
         @loggedIn = true
 
-    @shell.prompt()
+    @shell.prompt() if data.MESSAGE != "PONG"
 
 
   run: ->
@@ -175,8 +198,11 @@ class VictorOps extends Adapter
     @connectToVO()
 
     setInterval =>
-      if ( ! @loggedIn )
+      pongInterval = new Date().getTime() - @lastPong.getTime()
+      if ( ! @ws? || @ws.readyState != WebSocket.OPEN || ! @loggedIn || pongInterval > @pongLimit )
         @connectToVO()
+      else
+        @ping()
     , @loginRetryInterval
 
     @emit "connected"
