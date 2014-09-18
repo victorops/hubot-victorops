@@ -51,6 +51,7 @@ class VictorOps extends Adapter
     @loginAttempts = @getLoginAttempts()
     @loginRetryInterval = @envIntWithDefault( process.env.HUBOT_VICTOROPS_LOGIN_INTERVAL, 5 ) * 1000
     @pongLimit = @envIntWithDefault( process.env.HUBOT_VICTOROPS_LOGIN_PONG_LIMIT, 17000 )
+    @rcvdStatusList = false
     super robot
 
   envWithDefault: (envVar, defVal) ->
@@ -131,7 +132,7 @@ class VictorOps extends Adapter
       console.log "Unable to connect; giving up."
       process.exit 1
 
-    console.log "Attempting connection to VictorOps at #{@wsURL}..."
+    console.log "#{new Date()} Attempting connection to VictorOps at #{@wsURL}..."
 
     ws = new WebSocket(@wsURL)
 
@@ -151,6 +152,7 @@ class VictorOps extends Adapter
   disconnect: (error) ->
     @lastPong = new Date()
     @loggedIn = false
+    @rcvdStatusList = false
     if @ws?
       console.log("#{error} - disconnecting...")
       @ws.terminate()
@@ -175,6 +177,9 @@ class VictorOps extends Adapter
     else if data.MESSAGE == "PONG"
       @lastPong = new Date()
 
+    else if data.MESSAGE == "STATE_NOTIFY_MESSAGE" && data.PAYLOAD.USER_STATUS_LIST?
+      @rcvdStatusList = true
+
     else if data.MESSAGE == "ENTITY_STATE_NOTIFY_MESSAGE"
       user = @robot.brain.userForId "VictorOps"
       @rcvIncidentMsg user, entity for entity in data.PAYLOAD.SYSTEM_ALERT_STATE_LIST
@@ -188,6 +193,11 @@ class VictorOps extends Adapter
         @ws = ws
         @loginAttempts = @getLoginAttempts()
         @loggedIn = true
+        setTimeout =>
+          if ( ! @rcvdStatusList )
+            console.log "Did not get status list in time; reconnecting..."
+            @disconnect()
+        , 5000
 
     @shell.prompt() if data.MESSAGE != "PONG"
 
