@@ -172,7 +172,7 @@ class VictorOps extends Adapter
 
     if data.MESSAGE == "CHAT_NOTIFY_MESSAGE" && data.PAYLOAD.CHAT.USER_ID != @robot.name
       user = @robot.brain.userForId data.PAYLOAD.CHAT.USER_ID
-      @receive new TextMessage user, data.PAYLOAD.CHAT.TEXT
+      @receive new TextMessage user, data.PAYLOAD.CHAT.TEXT.replace(/&quot;/g,'"')
 
     else if data.MESSAGE == "PONG"
       @lastPong = new Date()
