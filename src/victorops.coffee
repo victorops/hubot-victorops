@@ -3,6 +3,7 @@
 # https://github.com/victorops/hubot-victorops/blob/master/LICENSE
 #==========================================================================
 
+Path = require 'path'
 Readline = require 'readline'
 WebSocket = require 'ws'
 {Adapter,Robot,TextMessage} = require 'hubot'
@@ -22,7 +23,7 @@ class Shell
     @repl = Readline.createInterface stdin, stdout, null
 
     @repl.on 'close', =>
-      console.log()
+      @robot.logger.info()
       stdin.destroy()
       @robot.shutdown()
       process.exit 0
@@ -103,7 +104,7 @@ class VictorOps extends Adapter
   sendToVO: (js, ws=@ws) ->
     m = JSON.stringify(js)
     message = "VO-MESSAGE:" + m.length + "\n" + m
-    console.log "send to chat server: #{message}" if js.MESSAGE != "PING"
+    @robot.logger.info "send to chat server: #{message}" if js.MESSAGE != "PING"
     ws.send( message )
 
   send: (user, strings...) ->
@@ -129,10 +130,10 @@ class VictorOps extends Adapter
     @disconnect()
 
     if @loginAttempts-- <= 0
-      console.log "Unable to connect; giving up."
+      @robot.logger.info "Unable to connect; giving up."
       process.exit 1
 
-    console.log "#{new Date()} Attempting connection to VictorOps at #{@wsURL}..."
+    @robot.logger.info "Attempting connection to VictorOps at #{@wsURL}..."
 
     ws = new WebSocket(@wsURL)
 
@@ -143,32 +144,32 @@ class VictorOps extends Adapter
       _.disconnect(error)
 
     ws.on "message", (message) ->
-      _.receive_ws( message, @ )
+      _.receiveWS( message, @ )
 
     ws.on 'close', () ->
       _.loggedIn = false
-      console.log 'WebSocket closed.'
+      @robot.logger.info 'WebSocket closed.'
 
   disconnect: (error) ->
     @lastPong = new Date()
     @loggedIn = false
     @rcvdStatusList = false
     if @ws?
-      console.log("#{error} - disconnecting...")
+      @robot.logger.info("#{error} - disconnecting...")
       @ws.terminate()
       @ws = null
 
-  # Transform incident notifications into hubot messages too
-  rcvIncidentMsg: ( user, entity ) ->
-    hubotMsg = "VictorOps entitystate #{JSON.stringify(entity)}"
-    console.log hubotMsg
+  rcvVOEvent: ( typ, obj ) ->
+    user = @robot.brain.userForId "VictorOps"
+    hubotMsg = "#{@robot.name} VictorOps #{typ} #{JSON.stringify(obj)}"
+    @robot.logger.info hubotMsg
     @receive new TextMessage user, hubotMsg
 
-  receive_ws: (msg, ws) ->
+  receiveWS: (msg, ws) ->
     data = JSON.parse( msg.replace /VO-MESSAGE:[^\{]*/, "" )
 
-    console.log "Received #{data.MESSAGE}" if data.MESSAGE != "PONG"
-    # console.log msg
+    @robot.logger.info "Received #{data.MESSAGE}" if data.MESSAGE != "PONG"
+    # @robot.logger.info msg
 
     if data.MESSAGE == "CHAT_NOTIFY_MESSAGE" && data.PAYLOAD.CHAT.USER_ID != @robot.name
       user = @robot.brain.userForId data.PAYLOAD.CHAT.USER_ID
@@ -182,11 +183,19 @@ class VictorOps extends Adapter
 
     else if data.MESSAGE == "ENTITY_STATE_NOTIFY_MESSAGE"
       user = @robot.brain.userForId "VictorOps"
-      @rcvIncidentMsg user, entity for entity in data.PAYLOAD.SYSTEM_ALERT_STATE_LIST
+      @rcvVOEvent 'entitystate', entity for entity in data.PAYLOAD.SYSTEM_ALERT_STATE_LIST
+
+    else if data.MESSAGE == "TIMELINE_LIST_REPLY_MESSAGE"
+      for item in data.PAYLOAD.TIMELINE_LIST
+        try
+          if item.ALERT
+            @rcvVOEvent 'alert', item.ALERT
+        catch
+          @robot.logger.info "Not an alert."
 
     else if data.MESSAGE == "LOGIN_REPLY_MESSAGE"
       if data.PAYLOAD.STATUS != "200"
-        console.log "Failed to log in: #{data.PAYLOAD.DESCRIPTION}"
+        @robot.logger.info "Failed to log in: #{data.PAYLOAD.DESCRIPTION}"
         @loggedIn = false
         ws.terminate()
       else
@@ -195,7 +204,7 @@ class VictorOps extends Adapter
         @loggedIn = true
         setTimeout =>
           if ( ! @rcvdStatusList )
-            console.log "Did not get status list in time; reconnecting..."
+            @robot.logger.info "Did not get status list in time; reconnecting..."
             @disconnect()
         , 5000
 
@@ -203,6 +212,9 @@ class VictorOps extends Adapter
 
 
   run: ->
+    pkg = require Path.join __dirname, '..', 'package.json'
+    @robot.logger.info "VictorOps adapter version #{pkg.version}"
+
     @shell = new Shell( @robot, @ )
 
     @connectToVO()
