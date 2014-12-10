@@ -112,7 +112,7 @@ class VictorOps extends Adapter
     @sendToVO( @chat( strings.join "\n" ) )
 
   reply: (user, strings...) ->
-    @send str for str in strings
+    @send user, strings
 
   respond: (regex, callback) ->
     @hear regex, callback
