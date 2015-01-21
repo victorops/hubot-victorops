@@ -101,11 +101,11 @@ class VictorOps extends Adapter
       }
     }
 
-  sendToVO: (js, ws=@ws) ->
+  sendToVO: (js) ->
     m = JSON.stringify(js)
     message = "VO-MESSAGE:" + m.length + "\n" + m
     @robot.logger.info "send to chat server: #{message}" if js.MESSAGE != "PING"
-    ws.send( message )
+    @ws.send( message )
 
   send: (user, strings...) ->
     js = @chat( strings.join "\n" )
@@ -125,8 +125,6 @@ class VictorOps extends Adapter
     @sendToVO(msg)
 
   connectToVO: () ->
-    _ = @
-
     @disconnect()
 
     if @loginAttempts-- <= 0
@@ -135,19 +133,19 @@ class VictorOps extends Adapter
 
     @robot.logger.info "Attempting connection to VictorOps at #{@wsURL}..."
 
-    ws = new WebSocket(@wsURL)
+    @ws = new WebSocket(@wsURL)
 
-    ws.on "open", () ->
-      _.sendToVO( _.login(), @ )
+    @ws.on "open", () =>
+      @sendToVO(@login())
 
-    ws.on "error", (error) ->
-      _.disconnect(error)
+    @ws.on "error", (error) =>
+      @disconnect(error)
 
-    ws.on "message", (message) ->
-      _.receiveWS( message, @ )
+    @ws.on "message", (message) =>
+      @receiveWS(message)
 
-    ws.on 'close', () ->
-      _.loggedIn = false
+    @ws.on 'close', () =>
+      @loggedIn = false
       @robot.logger.info 'WebSocket closed.'
 
   disconnect: (error) ->
@@ -165,7 +163,7 @@ class VictorOps extends Adapter
     @robot.logger.info hubotMsg
     @receive new TextMessage user, hubotMsg
 
-  receiveWS: (msg, ws) ->
+  receiveWS: (msg) ->
     data = JSON.parse( msg.replace /VO-MESSAGE:[^\{]*/, "" )
 
     @robot.logger.info "Received #{data.MESSAGE}" if data.MESSAGE != "PONG"
@@ -197,9 +195,8 @@ class VictorOps extends Adapter
       if data.PAYLOAD.STATUS != "200"
         @robot.logger.info "Failed to log in: #{data.PAYLOAD.DESCRIPTION}"
         @loggedIn = false
-        ws.terminate()
+        @ws.terminate()
       else
-        @ws = ws
         @loginAttempts = @getLoginAttempts()
         @loggedIn = true
         setTimeout =>
