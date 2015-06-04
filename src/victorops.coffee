@@ -187,6 +187,7 @@ class VictorOps extends Adapter
       for item in data.PAYLOAD.TIMELINE_LIST
         try
           if item.ALERT
+            @robot.emit "alert", item.ALERT
             @rcvVOEvent 'alert', item.ALERT
         catch
           @robot.logger.info "Not an alert."
