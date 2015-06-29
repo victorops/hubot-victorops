@@ -187,6 +187,7 @@ class VictorOps extends Adapter
       for item in data.PAYLOAD.TIMELINE_LIST
         try
           if item.ALERT
+            @robot.brain.set item.ALERT["INCIDENT_NAME"], item.ALERT
             @robot.emit "alert", item.ALERT
             @rcvVOEvent 'alert', item.ALERT
         catch
