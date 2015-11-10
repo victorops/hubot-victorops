@@ -187,7 +187,22 @@ class VictorOps extends Adapter
       for item in data.PAYLOAD.TIMELINE_LIST
         try
           if item.ALERT
-            @robot.brain.set item.ALERT["INCIDENT_NAME"], item.ALERT
+            # get a list of current victor ops incident keys in the brain
+            voIKeys = @robot.brain.get "VO_INCIDENT_KEYS"
+
+            # name the new key and set the brain
+            voCurIName = item.ALERT["INCIDENT_NAME"]
+            @robot.brain.set voCurIName, item.ALERT
+
+            # update the list of current victor ops incident keys in the brain
+            voIKeys.push
+              name: voCurIName
+              timestamp: new Date
+            @robot.brain.set "VO_INCIDENT_KEYS", voIKeys
+
+            # clean up victor ops incident keys in the brain
+            @cleanupBrain()
+
             @robot.emit "alert", item.ALERT
             @rcvVOEvent 'alert', item.ALERT
         catch
@@ -209,6 +224,22 @@ class VictorOps extends Adapter
 
     @shell.prompt() if data.MESSAGE != "PONG"
 
+  cleanupBrain: ->
+    # get a list of all the victor ops incident keys in the brain
+    voIKeys = @robot.brain.get "VO_INCIDENT_KEYS"
+
+    # remove keys from the victor ops incident keys list and from the brain
+    # if they are older than 24 hours
+    voIKeysFiltered = voIKeys.filter((item) ->
+      if new Date(item.timestamp).addDays(1) < new Date
+        @robot.brain.remove item.name
+        return false
+      true
+    )
+
+    # set the victor ops incident keys list in the the brain to the updated
+    # list value
+    @robot.brain.set "VO_INCIDENT_KEYS", voIKeysFiltered
 
   run: ->
     pkg = require Path.join __dirname, '..', 'package.json'
