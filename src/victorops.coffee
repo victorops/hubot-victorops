@@ -188,6 +188,9 @@ class VictorOps extends Adapter
         if item.ALERT?
           # get a list of current victor ops incident keys in the brain
           voIKeys = @robot.brain.get "VO_INCIDENT_KEYS"
+          # catch null lists and init as blank
+          if not voIKeys?
+            voIKeys = []          
 
           # name the new key and set the brain
           voCurIName = item.ALERT["INCIDENT_NAME"]
