@@ -185,27 +185,26 @@ class VictorOps extends Adapter
 
     else if data.MESSAGE == "TIMELINE_LIST_REPLY_MESSAGE"
       for item in data.PAYLOAD.TIMELINE_LIST
-        try
-          if item.ALERT
-            # get a list of current victor ops incident keys in the brain
-            voIKeys = @robot.brain.get "VO_INCIDENT_KEYS"
+        if item.ALERT?
+          # get a list of current victor ops incident keys in the brain
+          voIKeys = @robot.brain.get "VO_INCIDENT_KEYS"
 
-            # name the new key and set the brain
-            voCurIName = item.ALERT["INCIDENT_NAME"]
-            @robot.brain.set voCurIName, item.ALERT
+          # name the new key and set the brain
+          voCurIName = item.ALERT["INCIDENT_NAME"]
+          @robot.brain.set voCurIName, item.ALERT
 
-            # update the list of current victor ops incident keys in the brain
-            voIKeys.push
-              name: voCurIName
-              timestamp: new Date
-            @robot.brain.set "VO_INCIDENT_KEYS", voIKeys
+          # update the list of current victor ops incident keys in the brain
+          voIKeys.push
+            name: voCurIName
+            timestamp: new Date
+          @robot.brain.set "VO_INCIDENT_KEYS", voIKeys
 
-            # clean up victor ops incident keys in the brain
-            @cleanupBrain()
+          # clean up victor ops incident keys in the brain
+          @cleanupBrain()
 
-            @robot.emit "alert", item.ALERT
-            @rcvVOEvent 'alert', item.ALERT
-        catch
+          @robot.emit "alert", item.ALERT
+          @rcvVOEvent 'alert', item.ALERT
+        else
           @robot.logger.info "Not an alert."
 
     else if data.MESSAGE == "LOGIN_REPLY_MESSAGE"
