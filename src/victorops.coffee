@@ -108,11 +108,12 @@ class VictorOps extends Adapter
     @ws.send( message )
 
   send: (user, strings...) ->
-    js = @chat( strings.join "\n" )
+    #js = @chat( strings.join "\n" )
     @sendToVO( @chat( strings.join "\n" ) )
 
   reply: (user, strings...) ->
-    @send user, strings
+    strings = "@#{user.user.id}: #{strings.join "\n"}"
+    @sendToVO @chat( strings )
 
   respond: (regex, callback) ->
     @hear regex, callback
@@ -167,7 +168,8 @@ class VictorOps extends Adapter
     data = JSON.parse( msg.replace /VO-MESSAGE:[^\{]*/, "" )
 
     @robot.logger.info "Received #{data.MESSAGE}" if data.MESSAGE != "PONG"
-    # @robot.logger.info msg
+    # Turn on for debugging
+    #@robot.logger.info msg
 
     if data.MESSAGE == "CHAT_NOTIFY_MESSAGE" && data.PAYLOAD.CHAT.USER_ID != @robot.name
       user = @robot.brain.userForId data.PAYLOAD.CHAT.USER_ID
@@ -189,7 +191,8 @@ class VictorOps extends Adapter
           # get a list of current victor ops incident keys in the brain
           voIKeys = @robot.brain.get "VO_INCIDENT_KEYS"
           # catch null lists and init as blank
-          voIKeys ?= []          
+          if not voIKeys?
+            voIKeys = []
 
           # name the new key and set the brain
           voCurIName = item.ALERT["INCIDENT_NAME"]
@@ -233,7 +236,7 @@ class VictorOps extends Adapter
     # if they are older than 24 hours
     voIKeysFiltered = voIKeys.filter((item) ->
       if new Date(item.timestamp).getDate() + 1 < new Date
-        @robot.brain.remove item.name
+        #@robot.brain.remove item.name
         return false
       true
     )
