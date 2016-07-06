@@ -108,7 +108,6 @@ class VictorOps extends Adapter
     @ws.send( message )
 
   send: (user, strings...) ->
-    #js = @chat( strings.join "\n" )
     @sendToVO( @chat( strings.join "\n" ) )
 
   reply: (user, strings...) ->
