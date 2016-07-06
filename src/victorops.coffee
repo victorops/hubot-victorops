@@ -235,10 +235,7 @@ class VictorOps extends Adapter
     # remove keys from the victor ops incident keys list and from the brain
     # if they are older than 24 hours
     voIKeysFiltered = voIKeys.filter((item) ->
-      if new Date(item.timestamp).getDate() + 1 < new Date
-        #@robot.brain.remove item.name
-        return false
-      true
+      return (new Date(item.timestamp).getDate() + 1 >= new Date)
     )
 
     # set the victor ops incident keys list in the the brain to the updated
