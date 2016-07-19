@@ -1,6 +1,6 @@
 {
   "name":        "hubot-victorops",
-  "version":     "0.0.12",
+  "version":     "0.0.13",
   "author":      "VictorOps",
   "keywords":    "hubot hubot-victorops adapter victorops",
   "description": "A Hubot adapter that allows Hubot to join your VictorOps timeline.",
