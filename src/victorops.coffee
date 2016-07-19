@@ -219,6 +219,8 @@ class VictorOps extends Adapter
       else
         @loginAttempts = @getLoginAttempts()
         @loggedIn = true
+        if process.env.HUBOT_ANNOUNCE?
+          @sendToVO(@chat(process.env.HUBOT_ANNOUNCE))
         setTimeout =>
           if ( ! @rcvdStatusList )
             @robot.logger.info "Did not get status list in time; reconnecting..."
