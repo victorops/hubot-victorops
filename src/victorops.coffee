@@ -53,6 +53,7 @@ class VictorOps extends Adapter
     @loginRetryInterval = @envIntWithDefault( process.env.HUBOT_VICTOROPS_LOGIN_INTERVAL, 5 ) * 1000
     @pongLimit = @envIntWithDefault( process.env.HUBOT_VICTOROPS_LOGIN_PONG_LIMIT, 17000 )
     @rcvdStatusList = false
+    @expiryDays = parseInt(process.env.HUBOT_VICTOROPS_KEEP ? 1, 10)
     super robot
 
   envWithDefault: (envVar, defVal) ->
@@ -188,20 +189,12 @@ class VictorOps extends Adapter
       for item in data.PAYLOAD.TIMELINE_LIST
         if item.ALERT?
           # get a list of current victor ops incident keys in the brain
-          voIKeys = @robot.brain.get "VO_INCIDENT_KEYS"
-          # catch null lists and init as blank
-          if not voIKeys?
-            voIKeys = []
+          # handle null list
+          voIncs = @robot.brain.get "VO_INCIDENTS" ? {}
 
-          # name the new key and set the brain
-          voCurIName = item.ALERT["INCIDENT_NAME"]
-          @robot.brain.set voCurIName, item.ALERT
-
-          # update the list of current victor ops incident keys in the brain
-          voIKeys.push
-            name: voCurIName
-            timestamp: new Date
-          @robot.brain.set "VO_INCIDENT_KEYS", voIKeys
+          # Store the alert
+          voIncs[item.ALERT["INCIDENT_NAME"]] = item.ALERT
+          @robot.brain.set "VO_INCIDENTS", voIncs
 
           # clean up victor ops incident keys in the brain
           @cleanupBrain()
@@ -228,22 +221,24 @@ class VictorOps extends Adapter
     @shell.prompt() if data.MESSAGE != "PONG"
 
   cleanupBrain: ->
-    # get a list of all the victor ops incident keys in the brain
-    voIKeys = @robot.brain.get "VO_INCIDENT_KEYS"
+    # get the incident list, handle null
+    voIncs = @robot.brain.get "VO_INCIDENTS" ? {}
+    @robot.logger.debug "VO_INCIDENTS contains #{Object.keys(voIncs).length} items"
+    # 86400000 = 24 hours in ms (1000 * 60 * 60 * 24)
+    incExpiry = @expiryDays * 86400000
 
-    # remove keys from the victor ops incident keys list and from the brain
-    # if they are older than 24 hours
-    voIKeysFiltered = voIKeys.filter((item) ->
-      return (new Date(item.timestamp).getDate() + 1 >= new Date)
-    )
+    voIncsFiltered = {}
+    for num, alert of voIncs
+      # Only keep incidents with updates within the past 24 hours
+      if parseInt(alert.VO_ALERT_RCV_TIME, 10) + incExpiry >= new Date().getTime()
+        voIncsFiltered[num] = alert
 
-    # set the victor ops incident keys list in the the brain to the updated
-    # list value
-    @robot.brain.set "VO_INCIDENT_KEYS", voIKeysFiltered
+    @robot.brain.set "VO_INCIDENTS", voIncsFiltered
 
   run: ->
     pkg = require Path.join __dirname, '..', 'package.json'
     @robot.logger.info "VictorOps adapter version #{pkg.version}"
+    @robot.logger.info "Incidents will be stored in the redis brain for #{@expiryDays} days"
 
     @shell = new Shell( @robot, @ )
 
