@@ -33,7 +33,7 @@ Configuration of the key is in an environment variable:
 
 If you would like your bot to announce itself when it connects to the channel, you can add this additional environment variable, which will be sent to the timeline on a successful connection.
 
-Default: Blank (no message sent on join)
+**Default:** Blank (no message sent on join)
 
     export HUBOT_ANNOUNCE=Hubot reporting for duty!
 
@@ -41,8 +41,8 @@ Default: Blank (no message sent on join)
 
 This environment variable can be set to control how long JSON alert data for each incident is kept within the redis brain.
 
-Unit: Days
-Default: 1
+**Unit:** Days  
+**Default:** 1
 
     export HUBOT_VICTOROPS_KEEP=7
 
