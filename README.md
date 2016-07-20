@@ -26,6 +26,25 @@ Your Hubot will need a login key to connect to VictorOps.  Your Hubot key is ava
 Configuration of the key is in an environment variable:
 
     export HUBOT_VICTOROPS_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    
+### Optional settings
+
+#### HUBOT_ANNOUNCE
+
+If you would like your bot to announce itself when it connects to the channel, you can add this additional environment variable, which will be sent to the timeline on a successful connection.
+
+Default: Blank (no message sent on join)
+
+    export HUBOT_ANNOUNCE=Hubot reporting for duty!
+
+#### HUBOT_VICTOROPS_KEEP
+
+This environment variable can be set to control how long JSON alert data for each incident is kept within the redis brain.
+
+Unit: Days
+Default: 1
+
+    export HUBOT_VICTOROPS_KEEP=7
 
 ## Installation alternatives
 Rather than edit your Hubot's dependencies, you can install the adapter directly from github:
