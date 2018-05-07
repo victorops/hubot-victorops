@@ -13,7 +13,7 @@
     "url" : "http://github.com/victorops/hubot-victorops.git"
   },
   "dependencies": {
-    "ws": ">=0.4.31"
+    "ws": "=0.4.31"
   },
   "main": "./src/victorops"
 }
