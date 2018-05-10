@@ -177,7 +177,7 @@ class VictorOps extends Adapter
     else if data.MESSAGE == "PONG"
       @lastPong = new Date()
 
-    else if data.MESSAGE == "STATE_NOTIFY_MESSAGE" && data.PAYLOAD.USER_STATUS_LIST?
+    else if data.MESSAGE == "STATE_NOTIFY_MESSAGE" && data.PAYLOAD.ONCALL_LIST?
       @rcvdStatusList = true
 
     else if data.MESSAGE == "ENTITY_STATE_NOTIFY_MESSAGE"
